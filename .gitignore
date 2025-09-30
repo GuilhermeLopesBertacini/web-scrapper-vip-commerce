@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+.idea/
+
+# Data output
+/src/assets/
+*.json
