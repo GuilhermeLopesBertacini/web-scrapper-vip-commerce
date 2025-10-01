@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from multiprocessing import Pool
+from multiprocessing import Pool, current_process
 from typing import Dict, Tuple
 from tqdm import tqdm
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -18,7 +18,6 @@ import src.utils.config as constants
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-# Variável global para o driver, usada por cada processo do pool
 driver_process_global = None
 
 def init_worker():
@@ -27,18 +26,20 @@ def init_worker():
     """
     global driver_process_global
     
-    # Certifique-se que a variável CHROMEDRIVER_PATH está definida em seu config.py
     service = Service(executable_path=constants.CHROMEDRIVER_PATH) 
-    
     chrome_options = webdriver.ChromeOptions()
+    chrome_options.binary_location = constants.CHROME_BINARY_PATH
+
+    process_id = current_process().pid
+    user_data_dir = os.path.join('/tmp', f'chrome_profile_{process_id}')
+    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+
     chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--log-level=3")
-    chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
     
     driver_process_global = webdriver.Chrome(service=service, options=chrome_options)
-
 
 def download_image_worker(args: Tuple[str, str]) -> bool:
     """
@@ -46,7 +47,8 @@ def download_image_worker(args: Tuple[str, str]) -> bool:
     """
     global driver_process_global
     product_id, codigo_erp = args
-    product_page_url = f"{constants.API_BASE_URL}/produto/{product_id}"
+
+    product_page_url = f"{constants.DOMAIN_KEY}/produto/{product_id}"
     output_path = os.path.join(constants.RAW_IMAGES_DIR, f"{codigo_erp}.jpg")
 
     if os.path.exists(output_path):
@@ -56,26 +58,20 @@ def download_image_worker(args: Tuple[str, str]) -> bool:
         driver_process_global.get(product_page_url)
         wait = WebDriverWait(driver_process_global, 15)
 
-        # --- ETAPA 1: Lidar com o Banner de Cookies (COM SELETOR CORRIGIDO) ---
         try:
-            # Este é o seletor correto, extraído do seu HTML.
             cookie_button = wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "div.lgpd--cookie__opened button"))
             )
             cookie_button.click()
         except TimeoutException:
-            # Se o banner não aparecer, ótimo, apenas continuamos.
             pass
 
-        # --- ETAPA 2: Encontrar e baixar a imagem (COM SELETOR CORRIGIDO) ---
-        # Este seletor também foi validado como o mais provável para a imagem principal.
         image_element = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.vip-slide-wrapper img"))
+            EC.presence_of_element_located((By.CSS_SELECTOR, "vip-image.m-auto img"))
         )
         
         image_url = image_element.get_attribute('src')
         if not image_url or 'default_image' in image_url:
-            # Ignora imagens placeholder
             return False
 
         image_response = requests.get(image_url, timeout=20, verify=False)
@@ -93,15 +89,14 @@ def run():
     """
     Main function to orchestrate the image downloading process.
     """
-    print("Starting image download process (Final Method)...")
+    print("Starting image download process (Final Production Method)...")
 
-    # (A validação de configuração e o carregamento do JSON permanecem os mesmos)
     os.makedirs(constants.RAW_IMAGES_DIR, exist_ok=True)
     with open(constants.PRODUCT_MAP_PATH, 'r', encoding='utf-8') as f:
         product_map: Dict[str, str] = json.load(f)
     tasks = list(product_map.items())
     
-    processes = os.cpu_count()
+    processes = max(1, os.cpu_count()) 
     print(f"Running with {processes} parallel browser instances...")
 
     results = []

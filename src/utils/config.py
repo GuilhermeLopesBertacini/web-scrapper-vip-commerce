@@ -26,4 +26,5 @@ ASSETS_DIR = os.path.join(SRC_DIR, "assets")
 
 RAW_IMAGES_DIR = os.path.join(ASSETS_DIR, "raw_images")
 CHROMEDRIVER_PATH = os.path.join(ASSETS_DIR, "chromedriver-linux64", "chromedriver")
+CHROME_BINARY_PATH = os.path.join(ASSETS_DIR, "chrome-linux64", "chrome")
 PRODUCT_MAP_PATH = os.path.join(ASSETS_DIR, "data", "product_map.json")
