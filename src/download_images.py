@@ -101,7 +101,7 @@ def run():
         product_map: Dict[str, str] = json.load(f)
     tasks = list(product_map.items())
     
-    processes = max(1, os.cpu_count() // 2)
+    processes = os.cpu_count()
     print(f"Running with {processes} parallel browser instances...")
 
     results = []
