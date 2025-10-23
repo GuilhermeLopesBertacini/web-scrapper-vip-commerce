@@ -2,7 +2,7 @@ import os
 import json
 import requests
 from multiprocessing import Pool, current_process
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from tqdm import tqdm
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -48,42 +48,65 @@ def download_image_worker(args: Tuple[str, str]) -> bool:
     global driver_process_global
     product_id, codigo_erp = args
 
-    product_page_url = f"{constants.DOMAIN_KEY}/produto/{product_id}"
+    # Sempre salvar pelo codigo_erp para manter consistência com demais processos
     output_path = os.path.join(constants.RAW_IMAGES_DIR, f"{codigo_erp}.jpg")
 
     if os.path.exists(output_path):
         return True
-    
-    try:
-        driver_process_global.get(product_page_url)
-        wait = WebDriverWait(driver_process_global, 15)
 
+    def try_get_image_url(page_url: str) -> Optional[str]:
+        """Tenta carregar a página e extrair a URL da imagem do produto.
+        Retorna a URL da imagem se encontrada e válida; caso contrário, None.
+        """
+        if driver_process_global is None:
+            return None
         try:
-            cookie_button = wait.until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "div.lgpd--cookie__opened button"))
+            driver_process_global.get(page_url)
+            wait = WebDriverWait(driver_process_global, 15)
+
+            # Aceitar cookies se o banner aparecer
+            try:
+                cookie_button = wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "div.lgpd--cookie__opened button"))
+                )
+                cookie_button.click()
+            except TimeoutException:
+                pass
+
+            # Espera a imagem do produto aparecer
+            image_element = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "vip-image.m-auto img"))
             )
-            cookie_button.click()
-        except TimeoutException:
-            pass
 
-        image_element = wait.until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "vip-image.m-auto img"))
-        )
-        
-        image_url = image_element.get_attribute('src')
-        if not image_url or 'default_image' in image_url:
-            return False
+            image_url = image_element.get_attribute('src')
+            if not image_url or 'default_image' in image_url:
+                return None
+            return image_url
+        except (TimeoutException, WebDriverException):
+            return None
 
-        image_response = requests.get(image_url, timeout=20, verify=False)
-        image_response.raise_for_status()
-
-        with open(output_path, 'wb') as f:
-            f.write(image_response.content)
-        
-        return True
-    
-    except (TimeoutException, WebDriverException, requests.exceptions.RequestException, IOError):
+    # 1) Tenta pela URL com product_id
+    base = (constants.DOMAIN_KEY or "").rstrip('/')
+    if not base:
         return False
+    urls_to_try = [
+        f"{base}/produto/{product_id}",
+        f"{base}/produto/{codigo_erp}"
+    ]
+
+    for url in urls_to_try:
+        image_url = try_get_image_url(url)
+        if image_url:
+            try:
+                image_response = requests.get(image_url, timeout=20, verify=False)
+                image_response.raise_for_status()
+                with open(output_path, 'wb') as f:
+                    f.write(image_response.content)
+                return True
+            except (requests.exceptions.RequestException, IOError):
+                return False
+
+    return False
 
 def run():
     """
@@ -96,7 +119,7 @@ def run():
         product_map: Dict[str, str] = json.load(f)
     tasks = list(product_map.items())
     
-    processes = max(1, os.cpu_count()) 
+    processes = max(1, (os.cpu_count() or 1)) 
     print(f"Running with {processes} parallel browser instances...")
 
     results = []
