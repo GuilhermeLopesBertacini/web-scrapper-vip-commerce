@@ -1,0 +1,133 @@
+Web Scrapper VIP Commerce
+==========================
+
+Pequeno scrapper para baixar imagens de produtos do portal VIP Commerce.
+
+Este repositório contém um pipeline que percorre um mapa de produtos (`src/assets/data/product_map.json`), tenta obter a URL da imagem do produto (primeiro via HTTP + BeautifulSoup — rota rápida — e, se necessário, via Selenium) e salva as imagens em `src/assets/raw_images`.
+
+Índice
+------
+
+- Requisitos (dependências do sistema)
+- Estrutura de assets esperada
+- Configuração (variáveis / arquivo `.env`)
+- Como rodar
+- Debug e otimizações
+- Troubleshooting
+
+Requisitos (bibliotecas do sistema)
+----------------------------------
+
+O Chrome headless (ou a build do Chromium) com o chromedriver precisa das bibliotecas abaixo em sistemas Debian/Ubuntu. Execute como root/ sudo:
+
+```
+sudo apt-get update && sudo apt-get install -y \
+    libglib2.0-0t64 \
+    libnss3 \
+    libfontconfig1 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxi6 \
+    libxtst6 \
+    libasound2t64 \
+    libatk1.0-0t64 \
+    libatk-bridge2.0-0t64 \
+    libcups2t64 \
+    libdbus-1-3 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0t64 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libxfixes3 \
+    libxrandr2 \
+    libxss1 \
+    at-spi2-core
+```
+
+Observação: nomes das bibliotecas podem variar entre distribuições/versões — use o package manager da sua distro quando necessário.
+
+Estrutura de assets esperada
+----------------------------
+
+O projeto espera encontrar os binários do Chrome/Chromium e do Chromedriver dentro da pasta `src/assets` (já organizada no repo). A estrutura deve ser:
+
+- `src/assets/chrome-linux64/chrome` — executável do Chrome/Chromium (marcar como executável)
+- `src/assets/chromedriver-linux64/chromedriver` — binário do chromedriver compatível (marcar como executável)
+- `src/assets/data/product_map.json` — mapa de produtos (chave: product_id, valor: codigo_erp)
+- `src/assets/raw_images/` — pasta onde as imagens baixadas serão salvas (criada automaticamente)
+
+Certifique-se de que os binários têm permissão de execução:
+
+```
+chmod +x src/assets/chrome-linux64/chrome src/assets/chromedriver-linux64/chromedriver
+```
+
+Configuração
+-------------
+
+O código carrega algumas constantes de `src/utils/config.py`. O mais importante é o `DOMAIN_KEY` (o domínio base do site). Você pode configurá-lo de duas formas:
+
+1) Usando um arquivo `.env` na raiz do projeto (recomendado):
+
+```
+# .env (exemplo)
+DOMAIN_KEY=supervillesupermercado.com.br
+# AUTH_TOKEN=...
+# API_BASE_URL=...
+```
+
+2) Editando `src/utils/config.py` diretamente para alterar `DOMAIN_KEY` — menos recomendado, mas funciona.
+
+Como rodar
+----------
+
+Instale as dependências Python (recomendado em um virtualenv):
+
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Com o `.env` configurado (ou `src/utils/config.py` ajustado), rode o scrapper:
+
+```
+python3 -m src.download_images
+```
+
+Por padrão o script tenta extrair a imagem via HTTP (fast-path) e só recorre ao Selenium se necessário.
+
+Debug e execução local (abrir navegador)
+-------------------------------------
+
+Se precisar inspecionar visualmente o carregamento das páginas (para ajustar seletores, aceitar cookies, etc.), altere o valor `SHOW_BROWSER` dentro de `src/download_images.py` para `True` — isso fará com que o Chrome seja iniciado em modo visível (não-headless). Atualmente o arquivo já contém um bloco de configuração no topo onde você pode alternar `SHOW_BROWSER`, `MAX_WORKERS`, `SELENIUM_TIMEOUT`, `ALLOW_IMAGES` e `DEFAULT_CHUNKSIZE` manualmente.
+
+Performance e recomendações
+---------------------------
+
+- O script agora tenta primeiro obter a URL da imagem via `requests` + `BeautifulSoup` (muito mais rápido), e só abre o Chrome quando a página precisa de JS para montar a imagem.
+- Para reduzir uso de memória, mantenha `MAX_WORKERS` baixo (1-4). O default é `min(4, cpu_count)`.
+- `DEFAULT_CHUNKSIZE` controla o tamanho dos lotes enviados ao pool de processos — valores maiores reduzem overhead IPC.
+- Se a maioria das páginas não precisar de JS, o tempo total cairá muito porque o Chrome não será iniciado para cada produto.
+
+Problemas comuns e solução
+-------------------------
+
+- Chrome/Chromedriver não inicia: verifique dependências do sistema (instale pacotes acima), e permissões dos binários.
+- `DOMAIN_KEY` vazio: defina em `.env` ou em `src/utils/config.py`.
+- Selectors não batem (nenhuma imagem encontrada): rode com `SHOW_BROWSER=True`, abra uma entrada de produto e inspecione a tag da imagem — atualize o seletor CSS no `download_images.py` (`vip-image.m-auto img` é o seletor atual).
+
+Contato / próximo passos
+-----------------------
+
+Se quiser, posso:
+
+- Gerar um `README.md` separado (posso renomear este arquivo), com exemplos de configuração para docker ou CI.
+- Alterar `SHOW_BROWSER` para ficar configurável por variável de ambiente novamente, se preferir trocar sem editar o código.
+- Adicionar um pequeno script de diagnóstico que visite um produto e salve o HTML para inspeção.
+
+Boa sorte — me diga se quer que eu aplique alguma dessas melhorias ou gere um `README.md` com formato diferente.
