@@ -37,7 +37,7 @@ class ImageUploader:
     """Classe para gerenciar upload de imagens para Google Cloud Storage"""
     
     def __init__(self, bucket_name: str = "cart-production-assets", 
-                 destination_folder: str = "jaguare_product_images"):
+                 destination_folder: str = "test_product_images"):
         self.bucket_name = bucket_name
         self.destination_folder = destination_folder
         self.client = None
@@ -219,7 +219,7 @@ def main():
     """Função principal"""
     # Configurações
     BUCKET_NAME = "cart-production-assets"
-    DESTINATION_FOLDER = "jaguare_product_images"
+    DESTINATION_FOLDER = "urbanic_product_images"
     
     # Caminho para a pasta de imagens (relativo ao script)
     script_dir = Path(__file__).parent

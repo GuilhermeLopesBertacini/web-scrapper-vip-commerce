@@ -17,7 +17,7 @@ HEADERS = {
 
 # --- Constantes de Scraping e Datas ---
 START_DATE = "2024-09-26 01:01:01"
-END_DATE = "2025-09-26 01:01:01"
+END_DATE = "2026-02-05 01:01:01"
 REQUEST_DELAY = 0.2
 
 # --- Gerenciamento Dinâmico de Caminhos ---

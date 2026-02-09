@@ -43,6 +43,7 @@ def save_to_file(product_map: Dict[str, str], filename: str):
     Salva o mapa de produtos em um arquivo JSON.
     """
     try:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(product_map, f, indent=4, ensure_ascii=False)
         print(f"\nMapa de produtos salvo com sucesso em '{filename}'.")
