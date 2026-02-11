@@ -53,7 +53,8 @@ def fetch_products_page(page: int) -> Optional[Dict]:
             'page': page,
             'possui_imagem': 'true'
         }
-        headers = {
+        # Use the same authentication headers from config
+        headers = constants.HEADERS.copy() if hasattr(constants, 'HEADERS') else {
             'Accept': 'application/json'
         }
         

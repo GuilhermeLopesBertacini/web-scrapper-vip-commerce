@@ -219,7 +219,7 @@ def main():
     """Função principal"""
     # Configurações
     BUCKET_NAME = "cart-production-assets"
-    DESTINATION_FOLDER = "urbanic_product_images"
+    DESTINATION_FOLDER = "violeta_product_images"
     
     # Caminho para a pasta de imagens (relativo ao script)
     script_dir = Path(__file__).parent
