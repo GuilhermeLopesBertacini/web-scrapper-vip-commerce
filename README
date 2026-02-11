@@ -1,22 +1,62 @@
 Web Scrapper VIP Commerce
 ==========================
 
-Pequeno scrapper para baixar imagens de produtos do portal VIP Commerce.
+Pequeno scrapper para baixar imagens de produtos do portal VIP Commerce usando a API Urbanic.
 
-Este repositório contém um pipeline que percorre um mapa de produtos (`src/assets/data/product_map.json`), tenta obter a URL da imagem do produto (primeiro via HTTP + BeautifulSoup — rota rápida — e, se necessário, via Selenium) e salva as imagens em `src/assets/raw_images`.
+Este repositório contém um script que baixa imagens de produtos diretamente da API de integração da Urbanic. **Não requer Selenium, Chrome ou interface gráfica** — funciona puramente com requisições HTTP.
 
 Índice
 ------
 
-- Requisitos (dependências do sistema)
-- Estrutura de assets esperada
-- Configuração (variáveis / arquivo `.env`)
+- **Método Novo (Recomendado)**: API-based downloader
+- Método Antigo (Legado): Selenium-based scraper
 - Como rodar
-- Debug e otimizações
-- Troubleshooting
+- Configuração
 
-Requisitos (bibliotecas do sistema)
-----------------------------------
+---
+
+## 🚀 Método Novo (Recomendado): API-based Downloader
+
+**Vantagens:**
+- ✅ Muito mais rápido (sem overhead de navegador)
+- ✅ Roda em qualquer VM (sem necessidade de GUI/Chrome)
+- ✅ Dependências mínimas (apenas requests, tqdm, urllib3)
+- ✅ Mais confiável (dados diretos da API)
+
+### Requisitos
+
+Apenas Python 3.7+ e as dependências mínimas:
+
+```bash
+pip install -r requirements-minimal.txt
+```
+
+### Como rodar
+
+```bash
+python3 -m src.download_images_api
+```
+
+O script:
+1. Busca todos os produtos da API Urbanic (com paginação automática)
+2. Extrai as URLs das imagens (preferência por tamanho 250px, senão a maior disponível)
+3. Baixa em paralelo (8 workers) para `src/assets/raw_images/`
+4. Nomeia cada imagem pelo `codigo_erp.jpg`
+
+### Configuração
+
+Edite as constantes no topo de `src/download_images_api.py`:
+- `PREFERRED_IMAGE_SIZE = 250` — tamanho preferido (250, 500, 144, 60)
+- `MAX_WORKERS = 8` — número de downloads paralelos
+- `API_ENDPOINT` — URL da API (já configurado)
+
+---
+
+## 📦 Método Antigo (Legado): Selenium-based Scraper
+
+**⚠️ Apenas para referência.** Use o método API acima, que é muito superior.
+
+### Requisitos (bibliotecas do sistema)
 
 O Chrome headless (ou a build do Chromium) com o chromedriver precisa das bibliotecas abaixo em sistemas Debian/Ubuntu. Execute como root/ sudo:
 
@@ -50,8 +90,7 @@ sudo apt-get update && sudo apt-get install -y \
 
 Observação: nomes das bibliotecas podem variar entre distribuições/versões — use o package manager da sua distro quando necessário.
 
-Estrutura de assets esperada
-----------------------------
+### Estrutura de assets (Selenium legado)
 
 O projeto espera encontrar os binários do Chrome/Chromium e do Chromedriver dentro da pasta `src/assets` (já organizada no repo). A estrutura deve ser:
 
@@ -66,8 +105,16 @@ Certifique-se de que os binários têm permissão de execução:
 chmod +x src/assets/chrome-linux64/chrome src/assets/chromedriver-linux64/chromedriver
 ```
 
-Configuração
--------------
+### Como rodar (Selenium legado)
+
+```bash
+pip install -r requirements.txt
+python3 -m src.download_images
+```
+
+---
+
+## 📝 Notas
 
 O código carrega algumas constantes de `src/utils/config.py`. O mais importante é o `DOMAIN_KEY` (o domínio base do site). Você pode configurá-lo de duas formas:
 
@@ -80,54 +127,8 @@ DOMAIN_KEY=supervillesupermercado.com.br
 # API_BASE_URL=...
 ```
 
-2) Editando `src/utils/config.py` diretamente para alterar `DOMAIN_KEY` — menos recomendado, mas funciona.
+## 📊 Performance
 
-Como rodar
-----------
-
-Instale as dependências Python (recomendado em um virtualenv):
-
-```
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Com o `.env` configurado (ou `src/utils/config.py` ajustado), rode o scrapper:
-
-```
-python3 -m src.download_images
-```
-
-Por padrão o script tenta extrair a imagem via HTTP (fast-path) e só recorre ao Selenium se necessário.
-
-Debug e execução local (abrir navegador)
--------------------------------------
-
-Se precisar inspecionar visualmente o carregamento das páginas (para ajustar seletores, aceitar cookies, etc.), altere o valor `SHOW_BROWSER` dentro de `src/download_images.py` para `True` — isso fará com que o Chrome seja iniciado em modo visível (não-headless). Atualmente o arquivo já contém um bloco de configuração no topo onde você pode alternar `SHOW_BROWSER`, `MAX_WORKERS`, `SELENIUM_TIMEOUT`, `ALLOW_IMAGES` e `DEFAULT_CHUNKSIZE` manualmente.
-
-Performance e recomendações
----------------------------
-
-- O script agora tenta primeiro obter a URL da imagem via `requests` + `BeautifulSoup` (muito mais rápido), e só abre o Chrome quando a página precisa de JS para montar a imagem.
-- Para reduzir uso de memória, mantenha `MAX_WORKERS` baixo (1-4). O default é `min(4, cpu_count)`.
-- `DEFAULT_CHUNKSIZE` controla o tamanho dos lotes enviados ao pool de processos — valores maiores reduzem overhead IPC.
-- Se a maioria das páginas não precisar de JS, o tempo total cairá muito porque o Chrome não será iniciado para cada produto.
-
-Problemas comuns e solução
--------------------------
-
-- Chrome/Chromedriver não inicia: verifique dependências do sistema (instale pacotes acima), e permissões dos binários.
-- `DOMAIN_KEY` vazio: defina em `.env` ou em `src/utils/config.py`.
-- Selectors não batem (nenhuma imagem encontrada): rode com `SHOW_BROWSER=True`, abra uma entrada de produto e inspecione a tag da imagem — atualize o seletor CSS no `download_images.py` (`vip-image.m-auto img` é o seletor atual).
-
-Contato / próximo passos
------------------------
-
-Se quiser, posso:
-
-- Gerar um `README.md` separado (posso renomear este arquivo), com exemplos de configuração para docker ou CI.
-- Alterar `SHOW_BROWSER` para ficar configurável por variável de ambiente novamente, se preferir trocar sem editar o código.
-- Adicionar um pequeno script de diagnóstico que visite um produto e salve o HTML para inspeção.
-
-Boa sorte — me diga se quer que eu aplique alguma dessas melhorias ou gere um `README.md` com formato diferente.
+Resultados típicos (~9000 produtos):
+- **Método API**: ~2-5 minutos (depende da banda e workers)
+- **Método Selenium (legado)**: ~30-60 minutos
