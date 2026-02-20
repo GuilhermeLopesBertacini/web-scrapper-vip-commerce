@@ -17,7 +17,7 @@ import src.utils.config as constants
 urllib3.disable_warnings(InsecureRequestWarning)
 
 # Configuration
-API_ENDPOINT = "https://api-integracao.urbanic.com.br/importacao/produtos"
+API_ENDPOINT = f"{constants.API_BASE_URL}/importacao/produtos"
 PREFERRED_IMAGE_SIZE = 250  # Prefer 250px images
 MAX_WORKERS = 8  # Number of parallel download workers
 BATCH_SIZE = 50  # Products per API page
