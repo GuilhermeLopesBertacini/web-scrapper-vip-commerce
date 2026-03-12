@@ -20,6 +20,7 @@ except ImportError:
     print("Execute: pip install google-cloud-storage")
     sys.exit(1)
 
+from src.utils.config import GCS_BUCKET_NAME, GCS_FOLDER_NAME, RAW_IMAGES_DIR
 
 # Configuração de logging
 logging.basicConfig(
@@ -104,6 +105,29 @@ class ImageUploader:
             logger.error("3. Ou forneça um arquivo de credenciais JSON")
             return False
     
+    def get_remote_blob_names(self) -> set:
+        """
+        Obtém conjunto de nomes de arquivos que já existem no storage remoto
+        
+        Returns:
+            Set com nomes dos arquivos que já existem remotamente
+        """
+        try:
+            blobs = self.client.list_blobs(self.bucket_name, prefix=self.destination_folder + '/')
+            # Extrai apenas o nome do arquivo (sem o prefixo do diretório)
+            remote_files = set()
+            for blob in blobs:
+                # Remove o prefixo do diretório do nome do blob
+                file_name = blob.name.replace(f"{self.destination_folder}/", "")
+                if file_name:  # Ignora o diretório em si
+                    remote_files.add(file_name)
+            
+            logger.info(f"Encontrados {len(remote_files)} arquivos remotos em {self.destination_folder}")
+            return remote_files
+        except Exception as e:
+            logger.error(f"Erro ao listar blobs remotos: {e}")
+            return set()
+    
     def get_image_files(self, images_dir: str) -> List[Path]:
         """
         Obtém lista de arquivos de imagem na pasta especificada
@@ -148,9 +172,9 @@ class ImageUploader:
             blob = self.bucket.blob(blob_name)
             
             # Verifica se o arquivo já existe
-            if blob.exists():
-                logger.info(f"Arquivo já existe no storage: {blob_name}")
-                return True
+            # if blob.exists():
+            #     logger.info(f"Arquivo já existe no storage: {blob_name}")
+            #     return True
             
             # Faz o upload
             blob.upload_from_filename(str(local_file_path))
@@ -167,6 +191,7 @@ class ImageUploader:
     def upload_all_images(self, images_dir: str) -> dict:
         """
         Faz upload de todas as imagens da pasta especificada
+        Faz upload apenas de arquivos que não existem remotamente (diferença de sets)
         
         Args:
             images_dir: Caminho para a pasta de imagens
@@ -174,19 +199,57 @@ class ImageUploader:
         Returns:
             Dicionário com estatísticas do upload
         """
+        # Lista arquivos locais
         image_files = self.get_image_files(images_dir)
         
         if not image_files:
             logger.warning("Nenhum arquivo de imagem encontrado para upload")
             return {"total": 0, "success": 0, "failed": 0, "skipped": 0}
         
-        stats = {"total": len(image_files), "success": 0, "failed": 0, "skipped": 0}
+        # Lista arquivos remotos
+        logger.info("Listando arquivos remotos...")
+        remote_files = self.get_remote_blob_names()
         
-        logger.info(f"Iniciando upload de {len(image_files)} imagens...")
+        # Cria sets para comparação
+        local_file_names = {f.name for f in image_files}
+        
+        # Diferença de sets: arquivos que existem localmente mas não remotamente
+        files_to_upload = local_file_names - remote_files
+        files_already_exist = local_file_names & remote_files
+        
+        # Filtra apenas os arquivos que precisam ser enviados
+        image_files_to_upload = [f for f in image_files if f.name in files_to_upload]
+        
+        # Estatísticas
+        stats = {
+            "total": len(image_files),
+            "success": 0,
+            "failed": 0,
+            "skipped": len(files_already_exist)
+        }
+        
+        # Log da análise
+        print("\n" + "="*60)
+        print("ANÁLISE DE ARQUIVOS")
+        print("="*60)
+        print(f"📁 Arquivos locais encontrados: {len(local_file_names)}")
+        print(f"☁️  Arquivos remotos existentes: {len(remote_files)}")
+        print(f"✅ Arquivos já sincronizados: {len(files_already_exist)}")
+        print(f"📤 Arquivos a fazer upload: {len(files_to_upload)}")
+        print("="*60 + "\n")
+        
+        if files_already_exist:
+            logger.info(f"Arquivos que já existem remotamente (serão ignorados): {sorted(files_already_exist)}")
+        
+        if not image_files_to_upload:
+            logger.info("✅ Todos os arquivos já existem remotamente. Nenhum upload necessário.")
+            return stats
+        
+        logger.info(f"Iniciando upload de {len(image_files_to_upload)} imagens novas...")
         
         # Barra de progresso
-        with tqdm(total=len(image_files), desc="Uploading images") as pbar:
-            for image_file in image_files:
+        with tqdm(total=len(image_files_to_upload), desc="Uploading images") as pbar:
+            for image_file in image_files_to_upload:
                 try:
                     success = self.upload_file(image_file, image_file.name)
                     if success:
@@ -217,21 +280,18 @@ class ImageUploader:
 
 def main():
     """Função principal"""
-    # Configurações
-    BUCKET_NAME = "cart-production-assets"
-    DESTINATION_FOLDER = "violeta_product_images"
-    
-    # Caminho para a pasta de imagens (relativo ao script)
-    script_dir = Path(__file__).parent
-    images_dir = script_dir / "assets" / "raw_images"
-    
     print(f"Iniciando upload de imagens para Google Cloud Storage")
-    print(f"Bucket: {BUCKET_NAME}")
-    print(f"Pasta de destino: {DESTINATION_FOLDER}")
-    print(f"Pasta de origem: {images_dir}")
+    print(f"Bucket: {GCS_BUCKET_NAME}")
+    print(f"Pasta de destino: {GCS_FOLDER_NAME}")
+    print(f"Pasta de origem: {RAW_IMAGES_DIR}")
+
+    confirmation = input("Deseja continuar? (s/n): ").strip().lower()
+    if confirmation != 's':
+        print("Upload cancelado pelo usuário.")
+        sys.exit(0)
     
     # Inicializa o uploader
-    uploader = ImageUploader(BUCKET_NAME, DESTINATION_FOLDER)
+    uploader = ImageUploader(GCS_BUCKET_NAME, GCS_FOLDER_NAME)
     
     # Verifica se existe arquivo de credenciais (apenas se não estiver em GCP)
     credentials_path = None
@@ -260,7 +320,7 @@ def main():
         sys.exit(1)
     
     # Faz upload das imagens
-    stats = uploader.upload_all_images(str(images_dir))
+    stats = uploader.upload_all_images(str(RAW_IMAGES_DIR))
     
     # Mostra resumo
     uploader.print_summary(stats)

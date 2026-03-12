@@ -5,6 +5,8 @@ import os
 load_dotenv()
 
 # --- Constantes da API ---
+GCS_BUCKET_NAME= os.getenv("GCS_BUCKET_NAME", "")
+GCS_FOLDER_NAME = os.getenv("GCS_FOLDER_NAME", "")
 API_BASE_URL = os.getenv("API_BASE_URL")
 DOMAIN_KEY = os.getenv("DOMAIN_KEY")
 AUTH_TOKEN = os.getenv("AUTH_TOKEN")
