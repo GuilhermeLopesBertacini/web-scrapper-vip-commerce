@@ -8,3 +8,5 @@ venv/
 # Data output
 /src/assets/
 *.json
+*.txt
+*.out
