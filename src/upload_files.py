@@ -131,6 +131,42 @@ class ImageUploader:
         logger.info(f"Encontrados {len(image_files)} arquivos de imagem em {images_dir}")
         return sorted(image_files)
     
+    def delete_all_images_in_folder(self) -> dict:
+        """
+        Deleta todas as imagens da pasta de destino no Google Cloud Storage
+        
+        Returns:
+            Dicionário com estatísticas da deleção
+        """
+        try:
+            logger.info(f"Listando arquivos em {self.destination_folder}...")
+            blobs = list(self.bucket.list_blobs(prefix=f"{self.destination_folder}/"))
+            
+            if not blobs:
+                logger.info(f"Nenhum arquivo encontrado em {self.destination_folder}")
+                return {"total": 0, "deleted": 0, "failed": 0}
+            
+            stats = {"total": len(blobs), "deleted": 0, "failed": 0}
+            logger.info(f"Deletando {len(blobs)} arquivos de {self.destination_folder}...")
+            
+            with tqdm(total=len(blobs), desc="Deleting old images") as pbar:
+                for blob in blobs:
+                    try:
+                        blob.delete()
+                        stats["deleted"] += 1
+                        logger.debug(f"Deletado: {blob.name}")
+                    except Exception as e:
+                        logger.error(f"Erro ao deletar {blob.name}: {e}")
+                        stats["failed"] += 1
+                    pbar.update(1)
+            
+            logger.info(f"Deleção concluída: {stats['deleted']}/{stats['total']} arquivos deletados")
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Erro ao deletar arquivos: {e}")
+            return {"total": 0, "deleted": 0, "failed": 0}
+    
     def upload_file(self, local_file_path: Path, remote_file_name: str) -> bool:
         """
         Faz upload de um arquivo para o Google Cloud Storage
@@ -146,11 +182,6 @@ class ImageUploader:
             # Caminho completo no storage
             blob_name = f"{self.destination_folder}/{remote_file_name}"
             blob = self.bucket.blob(blob_name)
-            
-            # Verifica se o arquivo já existe
-            if blob.exists():
-                logger.info(f"Arquivo já existe no storage: {blob_name}")
-                return True
             
             # Faz o upload
             blob.upload_from_filename(str(local_file_path))
@@ -259,7 +290,20 @@ def main():
             print("2. Ou forneça um arquivo credentials.json")
         sys.exit(1)
     
-    # Faz upload das imagens
+    # Deleta todas as imagens antigas da pasta de destino
+    # print("\n" + "="*50)
+    # print("ETAPA 1: Deletando imagens antigas")
+    # print("="*50)
+    # delete_stats = uploader.delete_all_images_in_folder()
+    # if delete_stats["total"] > 0:
+    #     print(f"Deletados: {delete_stats['deleted']}/{delete_stats['total']} arquivos")
+    #     if delete_stats["failed"] > 0:
+    #         print(f"⚠️  {delete_stats['failed']} arquivos não puderam ser deletados")
+    
+    # # Faz upload das imagens
+    # print("\n" + "="*50)
+    print("ETAPA 2: Fazendo upload das novas imagens")
+    print("="*50)
     stats = uploader.upload_all_images(str(images_dir))
     
     # Mostra resumo
