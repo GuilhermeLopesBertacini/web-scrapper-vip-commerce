@@ -234,6 +234,6 @@ if __name__ == "__main__":
     # Example usage
     import src.utils.config as CONSTANTS
     gs_helper = GSHelper(bucket_name=CONSTANTS.GCS_BUCKET_NAME, project=CONSTANTS.GCP_PROJECT)
-    gs_helper.upload(cloud_path="public_superville/images/products_images/", local_path="/home/airis/Desktop/produtos/sv", skip_existing=True)
+    gs_helper.upload(cloud_path=CONSTANTS.GCS_FOLDER_NAME, local_path="/home/airis/web-scrapper-vip-commerce/data", skip_existing=False)
     # print("Starting to move images to new GCS path...")
     # gs_helper.move(cloud_path="public_urbanic/products_images/", dest_cloud_path="public_urbanic/images/products_images/")

@@ -10,3 +10,4 @@ venv/
 *.json
 *.txt
 *.out
+*jpg
