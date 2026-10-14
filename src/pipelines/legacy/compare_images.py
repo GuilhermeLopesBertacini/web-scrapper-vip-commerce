@@ -23,7 +23,7 @@ except ImportError:
     print("Execute: pip install google-cloud-storage")
     sys.exit(1)
 
-from utils.config import GCS_BUCKET_NAME, GCS_FOLDER_NAME, RAW_IMAGES_DIR
+from src.utils.config import GCS_BUCKET_NAME, GCS_FOLDER_NAME, RAW_IMAGES_DIR
 
 # Configuração de logging
 logging.basicConfig(

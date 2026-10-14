@@ -1,16 +1,28 @@
 Web Scrapper VIP Commerce
 ==========================
 
-Pequeno scrapper para baixar imagens de produtos do portal VIP Commerce usando a API Urbanic.
+Scrapper para baixar imagens de produtos do portal VIP Commerce usando a API Urbanic.
 
-Este repositório contém um script que baixa imagens de produtos diretamente da API de integração da Urbanic. **Não requer Selenium, Chrome ou interface gráfica** — funciona puramente com requisições HTTP.
+```
+src/
+├── pipelines/
+│   ├── api/            ← Pipeline Novo (recomendado)
+│   │   ├── download_images_api.py
+│   │   └── upload_files.py
+│   └── legacy/         ← Pipeline Antigo / Selenium (legado)
+│       ├── main.py
+│       ├── fetch_products_map.py
+│       ├── download_images.py
+│       └── compare_images.py
+└── utils/
+    └── config.py       ← configurações compartilhadas
+```
 
 Índice
 ------
 
-- **Método Novo (Recomendado)**: API-based downloader
-- Método Antigo (Legado): Selenium-based scraper
-- Como rodar
+- **Pipeline Novo (Recomendado)**: `src/pipelines/api/`
+- Pipeline Antigo (Legado): `src/pipelines/legacy/`
 - Configuração
 
 ---
@@ -34,21 +46,25 @@ pip install -r requirements-minimal.txt
 ### Como rodar
 
 ```bash
-python3 -m src.download_images_api
+# 1. Baixar imagens novas (compara com o GCP automaticamente)
+python3 -m src.pipelines.api.download_images_api
+
+# 2. (Opcional) Fazer upload para o GCP
+python3 -m src.pipelines.api.upload_files
 ```
 
-O script:
+O script de download:
 1. Busca todos os produtos da API Urbanic (com paginação automática)
-2. Extrai as URLs das imagens (preferência por tamanho 250px, senão a maior disponível)
-3. Baixa em paralelo (8 workers) para `src/assets/raw_images/`
+2. Lista imagens já existentes no GCP e calcula a diferença
+3. Baixa em paralelo **apenas as imagens novas** (8 workers) para `src/assets/raw_images/`
 4. Nomeia cada imagem pelo `codigo_erp.jpg`
 
 ### Configuração
 
-Edite as constantes no topo de `src/download_images_api.py`:
+Edite as constantes no topo de `src/pipelines/api/download_images_api.py`:
 - `PREFERRED_IMAGE_SIZE = 250` — tamanho preferido (250, 500, 144, 60)
 - `MAX_WORKERS = 8` — número de downloads paralelos
-- `API_ENDPOINT` — URL da API (já configurado)
+- `API_ENDPOINT` — URL da API (já configurado via `.env`)
 
 ---
 
@@ -109,7 +125,15 @@ chmod +x src/assets/chrome-linux64/chrome src/assets/chromedriver-linux64/chrome
 
 ```bash
 pip install -r requirements.txt
-python3 -m src.download_images
+
+# Etapa 1: gerar o mapa de produtos
+python3 -m src.pipelines.legacy.fetch_products_map
+
+# Etapa 2: baixar as imagens via Selenium
+python3 -m src.pipelines.legacy.download_images
+
+# Ou executar as duas etapas de uma vez:
+python3 -m src.pipelines.legacy.main
 ```
 
 ---

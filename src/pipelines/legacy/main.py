@@ -1,5 +1,5 @@
-from src.fetch_products_map import run as fetch_products_map
-from src.download_images import run as download_images
+from src.pipelines.legacy.fetch_products_map import run as fetch_products_map
+from src.pipelines.legacy.download_images import run as download_images
 
 def main():
     """

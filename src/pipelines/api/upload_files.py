@@ -20,7 +20,7 @@ except ImportError:
     print("Execute: pip install google-cloud-storage")
     sys.exit(1)
 
-from src.utils.config import GCS_BUCKET_NAME, GCS_FOLDER_NAME, RAW_IMAGES_DIR
+from src.utils.config import GCS_BUCKET_NAME, GCS_FOLDER_NAME, RAW_IMAGES_DIR  # shared config at src/utils/config.py
 
 # Configuração de logging
 logging.basicConfig(
@@ -214,7 +214,7 @@ class ImageUploader:
             
             # Faz o upload
             blob.upload_from_filename(str(local_file_path))
-            logger.info(f"Upload realizado: {local_file_path.name} -> {blob_name}")
+            # logger.info(f"Upload realizado: {local_file_path.name} -> {blob_name}")
             return True
             
         except GoogleCloudError as e:
@@ -275,7 +275,7 @@ class ImageUploader:
         print("="*60 + "\n")
         
         if files_already_exist:
-            logger.info(f"Arquivos que já existem remotamente (serão ignorados): {sorted(files_already_exist)}")
+            logger.info(f"Arquivos que já existem remotamente serão ignorados: {len(files_already_exist)}")
         
         if not image_files_to_upload:
             logger.info("✅ Todos os arquivos já existem remotamente. Nenhum upload necessário.")
